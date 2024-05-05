@@ -1,4 +1,6 @@
 use clap::{self, arg, command, value_parser, ArgAction};
+use std::ops::Range;
+use std::time::Duration;
 use count_write::CountWrite;
 use english_numbers;
 use human_repr::HumanCount;
@@ -26,6 +28,42 @@ impl From<Language> for numbers::Language {
         }
     }
 }
+
+struct Feat {
+    name: String,
+    duration: Duration,
+    range: Range<i64>,
+    sheets: Option<usize>,
+    typewriters: Option<u8>,
+    ink_ribbons: Option<usize>,
+}
+
+fn years(y: f32) -> Duration {
+    let k: u32 = 365 * 24 * 60 * 60;
+    Duration::from_secs((k as f32 * y) as u64)
+}
+
+fn feats() -> impl Iterator<Item = Feat> {
+    [Feat {
+        name: "Les Stewart".into(),
+        duration: years(16.58), // 16 years and 7 months
+        range: 1..1_000_000,
+        sheets: Some(19_890),
+        typewriters: Some(7),
+        ink_ribbons: Some(1_000),
+    },
+     Feat {
+        name: "Danny Johnson".into(),
+        duration: years(12.0),
+        range: 1..1_000_000,
+        sheets: Some(20_000),
+        typewriters: None,
+        ink_ribbons: Some(3_000), // 30 km of ribbon, 10m/ribbon
+    }
+    ].into_iter()
+
+}
+
 
 const DEFAULT_MIN: i64 = 1;
 const DEFAULT_MAX: i64 = 1_000_000;
