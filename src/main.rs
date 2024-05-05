@@ -1,8 +1,10 @@
 use numbers::*;
+use english_numbers;
 use count_write::CountWrite;
 use std::io::{self, Write};
 use std::env;
 use clap::{self, arg, command, value_parser, ArgAction};
+use human_repr::HumanCount;
 
 #[derive(clap::ValueEnum, Debug, Clone)]
 #[clap(rename_all = "kebab_case")]
@@ -30,10 +32,11 @@ fn main() -> std::io::Result<()> {
         .disable_version_flag(true)
         .arg(arg!(-c --count "Show the count in bytes")
             .action(ArgAction::SetTrue))
+        .arg(arg!(-H --humanize "Human readable byte count")
+            .action(ArgAction::SetTrue))
         .arg(arg!(-l --language [lang] "Choose language")
-             .value_parser(clap::builder::EnumValueParser::<LanguageArg>::new())
-        )
-
+             .action(ArgAction::Append)
+             .value_parser(clap::builder::EnumValueParser::<LanguageArg>::new()))
         .arg(arg!(-u --upto [upto] "Only count up to so many bytes")
              .num_args(1)
              .value_parser(value_parser!(u64)))
@@ -51,6 +54,7 @@ fn main() -> std::io::Result<()> {
             }
         }
     };
+    let humanize: bool = *matches.get_one("humanize").unwrap();
     let upto: Option<u64> = matches.get_one("upto").cloned();
     let langs: Vec<Language> = matches
         .get_many("language")
@@ -59,59 +63,56 @@ fn main() -> std::io::Result<()> {
              .map(|y: &LanguageArg| Language::from(y.clone()))
              .collect())
         .unwrap_or(vec![Language::English]);
-    let lang = Language::English;
 
     if *matches.get_one("count").unwrap() {
         let mut byte_counter = CountWrite::from(io::sink());
         match upto {
-            None => type_numbers(&mut byte_counter, &langs, min, max)?,
+            None => {
+                type_numbers(&mut byte_counter, &langs, min, |_, i| i < max)?;
+            }
             Some(max_bytes) => {
-                let number = type_numbers_cond(&mut byte_counter, &langs, min, |w| w.count() <= max_bytes)?;
+                let number = type_numbers(&mut byte_counter, &langs, min, |w, _| w.count() <= max_bytes)?;
                 println!("Reached number {number} in {} bytes.", byte_counter.count());
                 return Ok(());
             }
         }
-        println!("{}", byte_counter.count());
-        Ok(())
-    } else {
-        type_numbers(&mut io::stdout().lock(), &langs, min, max)
-    }
-}
-
-fn type_numbers<W: Write>(output: &mut W, langs: &[Language], min: i64, max: i64) -> io::Result<()> {
-    // let format = Formatting {
-    //     title_case: false,
-    //     conjunctions: false,
-    //     .. Formatting::all()
-    // };
-    for i in min..max {
-        for lang in langs {
-            writeln!(output, "{},", convert(*lang, i))?;
+        if humanize {
+            println!("{}", byte_counter.count().human_count_bytes());
+        } else {
+            println!("{}", byte_counter.count());
         }
-        // writeln!(output, "{},", french_number(&i))?;
+    } else {
+        type_numbers(&mut io::stdout().lock(), &langs, min, |_, i| i < max)?;
     }
-    for lang in langs {
-        writeln!(output, "{}.", convert(*lang, max))?;
-    }
-    // writeln!(output, "{},", french_number(&max))?;
     Ok(())
 }
 
-fn type_numbers_cond<W: Write, F: FnMut(&W) -> bool>(output: &mut W, langs: &[Language], min: i64, mut cond: F) -> io::Result<i64> {
-    // let format = Formatting {
-    //     title_case: false,
-    //     conjunctions: false,
-    //     .. Formatting::all()
-    // };
+fn convert(lang: Language, number: i64) -> String {
+    if lang == Language::English {
+        let format = english_numbers::Formatting {
+            title_case: false,
+            // conjunctions: false,
+            .. english_numbers::Formatting::all()
+        };
+        english_numbers::convert(number, format)
+    } else {
+        numbers::convert(lang, number)
+    }
+}
+
+fn type_numbers<W: Write, F: FnMut(&W, i64) -> bool>(output: &mut W, langs: &[Language], min: i64, mut cond: F) -> io::Result<i64> {
     let mut i = min;
     loop {
-        if ! cond(&output) {
+        if ! cond(&output, i) {
             break;
         };
         for lang in langs {
             writeln!(output, "{},", convert(*lang, i))?;
         }
         i += 1;
+    }
+    for lang in langs {
+        writeln!(output, "{}.", convert(*lang, i))?;
     }
     Ok(i)
 }
