@@ -9,12 +9,30 @@ numbers from one to one million in English&mdash;[with one finger!](https://www.
 
 # Example
 
+## One argument specifies the max
+
 ``` sh
-> ./sixteen-years-of-success 10
-Zero, One, Two, Three, Four, Five, Six, Seven, Eight, Nine, Ten.
+> ./sixteen-years-of-success 5
+one,
+two,
+three,
+four,
+five.
 ```
 
-## No argument will go to one million
+## Two arguments specifies the min and max
+
+``` sh
+> ./sixteen-years-of-success 5
+five,
+six,
+seven,
+eight,
+nine,
+ten.
+```
+
+## No arguments will go from one to one million
 
 ``` sh
 > time ./sixteen-years-of-success > so-many-numbers.txt
