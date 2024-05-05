@@ -7,6 +7,8 @@
 This is dedicated to Les Stewart the man who spent 16 years writing out the
 numbers from one to one million in English&mdash;[with one finger!](https://www.ctvnews.ca/halifax-man-spends-12-years-typing-out-numbers-to-1m-1.648060)
 
+> I just did what I was best at and if you do what you’re good at, then you’re halfway there.&mdash;Les Stewart
+
 # Example
 
 ## One argument specifies the max
@@ -44,3 +46,8 @@ ten.
 # References
 
 - [I joke on mastodon.](https://mastodon.gamedev.place/@shanecelis/112367041624311312)
+- [Typewriter odyssey half over](https://www.cbc.ca/news/canada/typewriter-odyssey-half-over-1.404232)
+- [World Record for Typing Numbers in Words](https://www.recordholders.org/en/records/typing.html)
+- [Halifax man spends 12 years typing out numbers to 1M](https://www.ctvnews.ca/halifax-man-spends-12-years-typing-out-numbers-to-1m-1.648060)
+- [Meet The Australian Man Who Spent 16 Years Typing Numbers One To One Million](https://www.news18.com/viral/meet-the-australian-man-who-spent-16-years-typing-numbers-one-to-one-million-8781004.html#)
+
