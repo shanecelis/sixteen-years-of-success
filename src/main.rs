@@ -2,25 +2,27 @@ use clap::{self, arg, command, value_parser, ArgAction};
 use count_write::CountWrite;
 use english_numbers;
 use human_repr::HumanCount;
-use numbers::*;
+use numbers;
 use std::env;
 use std::io::{self, Write};
 
-#[derive(clap::ValueEnum, Debug, Clone)]
+#[derive(clap::ValueEnum, Debug, Clone, Copy)]
 #[clap(rename_all = "kebab_case")]
-enum LanguageArg {
+enum Language {
     // #[default]
     English,
     French,
     Chinese,
+    Numeric
 }
 
-impl From<LanguageArg> for Language {
-    fn from(this: LanguageArg) -> Self {
+impl From<Language> for numbers::Language {
+    fn from(this: Language) -> Self {
         match this {
-            LanguageArg::English => Self::English,
-            LanguageArg::French => Self::French,
-            LanguageArg::Chinese => Self::Chinese,
+            Language::English => Self::English,
+            Language::French => Self::French,
+            Language::Chinese => Self::Chinese,
+            x => panic!("No conversion from {x:?}")
         }
     }
 }
@@ -35,7 +37,7 @@ fn main() -> std::io::Result<()> {
         .arg(
             arg!(-l --language [lang] "Choose language")
                 .action(ArgAction::Append)
-                .value_parser(clap::builder::EnumValueParser::<LanguageArg>::new()),
+                .value_parser(clap::builder::EnumValueParser::<Language>::new()),
         )
         .arg(
             arg!(-u --upto [upto] "Only count up to so many bytes")
@@ -62,8 +64,8 @@ fn main() -> std::io::Result<()> {
     let upto: Option<u64> = matches.get_one("upto").cloned();
     let langs: Vec<Language> = matches
         .get_many("language")
-        .map(|x: clap::parser::ValuesRef<LanguageArg>| {
-            x.map(|y: &LanguageArg| Language::from(y.clone())).collect()
+        .map(|x: clap::parser::ValuesRef<Language>| {
+            x.map(|y: &Language| Language::from(y.clone())).collect()
         })
         .unwrap_or(vec![Language::English]);
 
@@ -93,15 +95,21 @@ fn main() -> std::io::Result<()> {
 }
 
 fn convert(lang: Language, number: i64) -> String {
-    if lang == Language::English {
-        let format = english_numbers::Formatting {
-            title_case: false,
-            // conjunctions: false,
-            ..english_numbers::Formatting::all()
-        };
-        english_numbers::convert(number, format)
-    } else {
-        numbers::convert(lang, number)
+    match lang {
+        Language::English => {
+            let format = english_numbers::Formatting {
+                title_case: false,
+                // conjunctions: false,
+                ..english_numbers::Formatting::all()
+            };
+            english_numbers::convert(number, format)
+        }
+        Language::Numeric => {
+            number.to_string()
+        }
+        lang => {
+            numbers::convert(lang.into(), number)
+        }
     }
 }
 
