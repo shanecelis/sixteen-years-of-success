@@ -9,5 +9,7 @@ edition = "2021"
 clap = { version = "4.5.4", features = ["cargo", "derive"] }
 count-write = "0.1.0"
 english-numbers = "0.3.3"
+human-duration = "0.1.0"
 human-repr = "1.1.0"
 numbers = "0.1.2"
+time-humanize = "0.1.3"

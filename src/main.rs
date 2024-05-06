@@ -1,8 +1,11 @@
 use clap::{self, arg, command, value_parser, ArgAction};
+use std::fmt;
 use std::ops::Range;
 use std::time::Duration;
 use count_write::CountWrite;
 use english_numbers;
+use human_duration::human_duration;
+use time_humanize::HumanTime;
 use human_repr::HumanCount;
 use numbers;
 use std::env;
@@ -18,6 +21,17 @@ enum Language {
     Numeric
 }
 
+impl fmt::Display for Language {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", match self {
+            Language::English => "in English",
+            Language::French => "in French",
+            Language::Chinese => "in Chinese",
+            Language::Numeric => "numerically",
+        })
+    }
+}
+
 impl From<Language> for numbers::Language {
     fn from(this: Language) -> Self {
         match this {
@@ -29,13 +43,82 @@ impl From<Language> for numbers::Language {
     }
 }
 
+#[derive(Debug, Clone)]
 struct Feat {
     name: String,
     duration: Duration,
+    languages: Vec<Language>,
+    extrapolated: bool,
     range: Range<i64>,
     sheets: Option<usize>,
     typewriters: Option<u8>,
     ink_ribbons: Option<usize>,
+    bytes: Option<usize>,
+}
+
+impl std::ops::Mul<f64> for &Feat {
+    type Output = Feat;
+
+    // Required method
+    fn mul(self, factor: f64) -> Self::Output {
+        let range_size = self.range.end - self.range.start;
+        Feat {
+            name: self.name.clone(),
+            duration: Duration::from_secs((self.duration.as_secs_f64() * factor) as u64),
+            range: self.range.clone(),
+            // range: Range {
+            //     start: self.range.start,
+            //     end: self.range.start + (range_size as f64 * factor) as i64
+            // },
+            sheets: self.sheets.map(|x| (x as f64 * factor) as usize),
+            typewriters: self.typewriters.map(|x| (x as f64 * factor) as u8),
+            ink_ribbons: self.ink_ribbons.map(|x| (x as f64 * factor) as usize),
+            bytes: self.bytes.map(|x| (x as f64 * factor) as usize),
+            extrapolated: true,
+            languages: self.languages.clone(),
+        }
+    }
+}
+
+impl fmt::Display for Feat {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//Seven manual typewriters, 1000 ink ribbons, 19,890 pages, 16 years and seven months later, he finished with the lines
+        write!(f, "{} {}used ", self.name, if self.extrapolated { "would have " } else { "" })?;
+        if let Some(typewriters) = self.typewriters {
+            write!(f, "{} manual typewriters, ", typewriters)?;
+        }
+        if let Some(ribbons) = self.ink_ribbons {
+            write!(f, "{} ink ribbons, ", ribbons)?;
+        }
+        if let Some(pages) = self.sheets {
+            write!(f, "{} pages, ", pages)?;
+        }
+        let time = format!("{}", HumanTime::from(self.duration));
+        write!(f, "and {} {} ", if self.extrapolated { "taken" } else { "took" }, time.strip_prefix("in ").unwrap_or(&time))?;
+
+        write!(f, "to type numbers ")?;
+        let mut i = 0;
+        for lang in &self.languages {
+            if i != 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", lang)?;
+            i += 1;
+        }
+        write!(f, " from {} to {}.", self.range.start, self.range.end)
+    }
+}
+
+impl Feat {
+    fn extrapolate(&self, bytes: usize) -> Feat {
+        let original_bytes = self.bytes.unwrap();
+        let factor = bytes as f64 / original_bytes as f64;
+        if (1.0 - factor).abs() < 0.01 {
+            self.clone()
+        } else {
+            self * factor
+        }
+    }
 }
 
 fn years(y: f32) -> Duration {
@@ -47,23 +130,27 @@ fn feats() -> impl Iterator<Item = Feat> {
     [Feat {
         name: "Les Stewart".into(),
         duration: years(16.58), // 16 years and 7 months
+        languages: vec![Language::English],
         range: 1..1_000_000,
         sheets: Some(19_890),
         typewriters: Some(7),
         ink_ribbons: Some(1_000),
+        bytes: Some(62_017_013),
+        extrapolated: false,
     },
      Feat {
         name: "Danny Johnson".into(),
+        languages: vec![Language::Numeric, Language::English],
         duration: years(12.0),
         range: 1..1_000_000,
         sheets: Some(20_000),
         typewriters: None,
         ink_ribbons: Some(3_000), // 30 km of ribbon, 10m/ribbon
+        bytes: Some(62_017_013),
+        extrapolated: false,
     }
     ].into_iter()
-
 }
-
 
 const DEFAULT_MIN: i64 = 1;
 const DEFAULT_MAX: i64 = 1_000_000;
@@ -72,6 +159,8 @@ fn main() -> std::io::Result<()> {
         .disable_version_flag(true)
         .arg(arg!(-c --count "Show the count in bytes").action(ArgAction::SetTrue))
         .arg(arg!(-H --humanize "Human readable byte count").action(ArgAction::SetTrue))
+        .arg(arg!(-e --extrapolate [person] "Compare with typing feat")
+             .action(ArgAction::Append))
         .arg(
             arg!(-l --language [lang] "Choose language")
                 .action(ArgAction::Append)
@@ -107,7 +196,7 @@ fn main() -> std::io::Result<()> {
         })
         .unwrap_or(vec![Language::English]);
 
-    if *matches.get_one("count").unwrap() {
+    let byte_count = if *matches.get_one("count").unwrap() {
         let mut byte_counter = CountWrite::from(io::sink());
         match upto {
             None => {
@@ -126,11 +215,38 @@ fn main() -> std::io::Result<()> {
         } else {
             println!("{}", byte_counter.count());
         }
+        byte_counter.count()
     } else {
-        type_numbers(&mut io::stdout().lock(), &langs, min, |_, i| i < max)?;
+        let mut stdout = io::stdout().lock();
+        let mut byte_counter = CountWrite::from(&mut stdout);
+        type_numbers(&mut byte_counter, &langs, min, |_, i| i < max)?;
+        byte_counter.count()
+    } as usize;
+
+    if let Some(people) = matches.get_many::<String>("extrapolate") {
+        for person in people {
+            if let Some(person) = find_case_insensitive(feats(), |f| f.name.clone(), person) {
+                let mut extrapolated_feat = person.extrapolate(byte_count);
+                extrapolated_feat.languages = langs.clone();
+                println!("{}", extrapolated_feat);
+
+            } else {
+                println!("No feat found for '{}'.", person);
+            }
+        }
     }
     Ok(())
 }
+
+fn find_case_insensitive<T, F: Fn(&T) -> String>(mut iter: impl Iterator<Item = T>, key: F, search: &str) -> Option<T> {
+    // Convert search term to lowercase for case-insensitive comparison
+    let search_lower = search.to_lowercase();
+
+    // Find an item in the vec with case-insensitive match
+    iter
+        .find(|item| key(item).to_lowercase().contains(&search_lower))
+}
+
 
 fn convert(lang: Language, number: i64) -> String {
     match lang {
@@ -171,4 +287,16 @@ fn type_numbers<W: Write, F: FnMut(&W, i64) -> bool>(
         writeln!(output, "{}.", convert(*lang, i))?;
     }
     Ok(i)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_display() {
+        let feat = feats().next().unwrap();
+        assert_eq!(format!("{feat}"), "Les Stewart used 7 manual typewriters, 1000 ink ribbons, 19890 pages, and took 16 years to type numbers from 1 to 1000000.");
+
+    }
+
 }

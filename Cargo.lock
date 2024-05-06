@@ -138,6 +138,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2304e00983f87ffb38b55b444b5e3b60a884b5d30c0fca7d82fe33449bbe55ea"
 
 [[package]]
+name = "human-duration"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "37a429277d8afba0e1a2cf784b43f938dff72ce33e6aba477c3021997171c87b"
+
+[[package]]
 name = "human-repr"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -203,8 +209,10 @@ dependencies = [
  "clap",
  "count-write",
  "english-numbers",
+ "human-duration",
  "human-repr",
  "numbers",
+ "time-humanize",
 ]
 
 [[package]]
@@ -223,6 +231,12 @@ dependencies = [
  "quote",
  "unicode-ident",
 ]
+
+[[package]]
+name = "time-humanize"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3e32d019b4f7c100bcd5494e40a27119d45b71fba2b07a4684153129279a4647"
 
 [[package]]
 name = "unicode-ident"
